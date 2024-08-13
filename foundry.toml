@@ -2,5 +2,9 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+solc = "0.8.26"  # Use an appropriate Solidity version that supports Cancun features
+
+# Specify Cancun as the EVM version
+evm_version = "cancun"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
