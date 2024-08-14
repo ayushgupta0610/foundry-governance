@@ -11,12 +11,12 @@ contract Counter is Ownable {
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
-    function setNumber(uint256 newNumber) public onlyOwner {
+    function setNumber(uint256 newNumber) public {
         emit Set(number, newNumber);
         number = newNumber;
     }
 
-    function increment() public {
+    function increment() public onlyOwner {
         emit Increment(number + 1);
         number++;
     }

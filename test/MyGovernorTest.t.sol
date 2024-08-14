@@ -60,7 +60,6 @@ contract MyGovernorTest is Test {
 
         // Note: this is not the address of the governor, but the address of the timelock
         counter = new Counter(address(timelock));
-
     }
 
     function testCantUpdateCounterWithoutGovernance() public {
@@ -77,7 +76,7 @@ contract MyGovernorTest is Test {
         uint256[] memory values = new uint256[](1);
         values[0] = 0;
         bytes[] memory functionCalls = new bytes[](1);
-        functionCalls[0] = abi.encode("setNumber(uint256)", 5);
+        functionCalls[0] = abi.encodeWithSelector(Counter.setNumber.selector, 5);
         string memory description = "Setting a number";
         vm.prank(USER);
         uint256 proposalId = governor.propose(addressesToCall, values, functionCalls, description);
