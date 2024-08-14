@@ -14,7 +14,7 @@ import {GovernorTimelockControl, TimelockController} from "@openzeppelin/contrac
 contract MyGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
     constructor(IVotes _token, TimelockController _timelock)
         Governor("MyGovernor")
-        GovernorSettings(7200 /* 1 day */, 50400 /* 1 week */, 10e18)
+        GovernorSettings(1 /* 1 block */, 50400 /* 1 week */, 10e18)
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(4)
         GovernorTimelockControl(_timelock)
@@ -106,6 +106,24 @@ contract MyGovernor is Governor, GovernorSettings, GovernorCountingSimple, Gover
         returns (address)
     {
         return super._executor();
+    }
+
+    function queue(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        bytes32 descriptionHash
+    ) public virtual override returns (uint256) {
+        return super.queue(targets, values, calldatas, descriptionHash);
+    }
+
+    function execute(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        bytes32 descriptionHash
+    ) public payable virtual override returns (uint256) {
+        return super.execute(targets, values, calldatas, descriptionHash);
     }
 
 }

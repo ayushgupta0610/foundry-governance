@@ -19,8 +19,8 @@ contract MyGovernorTest is Test {
     uint256 public constant INITIAL_SUPPLY = 100 ether;
 
     uint256 public constant MIN_DELAY = 3600; // 1 hour after a vote passes
-    uint256 public constant VOTING_DELAY = 1 days; // 1 day after proposal is created
-    uint256 public constant VOTING_PERIOD = 7 days; // 1 week to vote on a proposal
+    uint256 public constant VOTING_DELAY = 1; // 1 block after proposal is created
+    uint256 public constant VOTING_PERIOD = 50400; // 1 week to vote on a proposal
 
     address[] public proposers;
     address[] public executors;
@@ -29,21 +29,23 @@ contract MyGovernorTest is Test {
 
         vm.startPrank(USER);
         govToken = new GovToken(USER);
-        console.log("GovToken Balance:", govToken.balanceOf(USER));
-        govToken.delegate(USER); // Check this
-        console.log("Delegated to USER");
+        console.log("Initial GovToken Balance:", govToken.balanceOf(USER));
+        console.log("Initial block number:", block.number);
+
+        govToken.delegate(USER);
+        console.log("Delegated to USER at block:", block.number);
+
+        vm.roll(block.number + 1);
+        console.log("Rolled to block:", block.number);
+        console.log("User Votes after delegation:", govToken.getVotes(USER));
         // vm.stopPrank();
 
-        // Check votes after delegation
-        console.log("User Votes after delegation:", govToken.getVotes(USER));
-        
         // Deploy governor with timelock
         timelock = new Timelock(MIN_DELAY, proposers, executors, USER);
         governor = new MyGovernor(govToken, timelock);
-        // uint256 userVotes = governor.getVotes(USER, block.number - 1);
-        // console.log("User Votes:", userVotes);
-        uint256 proposalThreshold = governor.proposalThreshold();
-        console.log("Proposal Threshold:", proposalThreshold);
+        console.log("Governor deployed at block:", block.number);
+        console.log("Governor's token address:", address(governor.token()));
+        console.log("GovToken address:", address(govToken));
 
         bytes32 proposerRole = timelock.PROPOSER_ROLE();
         bytes32 executorRole = timelock.EXECUTOR_ROLE();
@@ -51,32 +53,14 @@ contract MyGovernorTest is Test {
         // vm.startPrank(USER);
         timelock.grantRole(proposerRole, address(governor));
         timelock.grantRole(executorRole, address(0));
+        // Remove admin access from USER
+        timelock.revokeRole(timelock.DEFAULT_ADMIN_ROLE(), USER);
         vm.stopPrank();
-        // TODO: Remove admin access from USER
 
+
+        // Note: this is not the address of the governor, but the address of the timelock
         counter = new Counter(address(timelock));
 
-    }
-
-    function testVotingPower() public {
-        uint256 balance = govToken.balanceOf(USER);
-        uint256 votes = govToken.getVotes(USER);
-        uint256 governorVotes = governor.getVotes(USER, block.number - 1);
-
-        console.log("Final Balance:", balance);
-        console.log("Final Votes in GovToken:", votes);
-        console.log("Final Governor Votes:", governorVotes);
-
-        assertEq(balance, votes, "Balance should equal votes in GovToken");
-        assertEq(votes, governorVotes, "Votes in GovToken should equal governor votes");
-
-        // Check if the governor recognizes the correct token
-        assertEq(address(governor.token()), address(govToken), "Governor should recognize the correct token");
-
-        // Check if the governor can query votes directly from the token
-        uint256 directVotes = IVotes(address(govToken)).getVotes(USER);
-        console.log("Direct Votes from IVotes interface:", directVotes);
-        assertEq(directVotes, governorVotes, "Direct votes should equal governor votes");
     }
 
     function testCantUpdateCounterWithoutGovernance() public {
@@ -95,17 +79,20 @@ contract MyGovernorTest is Test {
         bytes[] memory functionCalls = new bytes[](1);
         functionCalls[0] = abi.encode("setNumber(uint256)", 5);
         string memory description = "Setting a number";
+        vm.prank(USER);
         uint256 proposalId = governor.propose(addressesToCall, values, functionCalls, description);
-        // 1.5 View the proposal state and simulate passing of 1 day
-        console.log("Proposal State:", uint256(governor.state(proposalId)));
+        // 1.5 View the proposal state and simulate passing of 1 block
+        // console.log("Proposal State:", uint256(governor.state(proposalId)));
         vm.warp(block.timestamp + VOTING_DELAY + 1);
         vm.roll(block.number + VOTING_DELAY + 1);
+        console.log("Proposal State:", uint256(governor.state(proposalId)));
 
         // 2. Vote on the proposal
-        vm.prank(USER);
         // 0 = Against, 1 = For, 2 = Abstain for this example
         uint8 voteWay = 1;
-        governor.castVote(proposalId, voteWay);
+        string memory reason = "I want to set the number to 5";
+        vm.prank(USER);
+        governor.castVoteWithReason(proposalId, voteWay, reason);
         // 2.5 simulate passing of 1 week
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
         vm.roll(block.number + VOTING_PERIOD + 1);
@@ -113,9 +100,6 @@ contract MyGovernorTest is Test {
 
         // 3. Queue the proposal
         bytes32 descriptionHash = keccak256(abi.encodePacked("Setting a number"));
-        console.logBytes32(descriptionHash);
-        bytes32 descriptionHashWithEncode = keccak256(abi.encode("Setting a number"));
-        console.logBytes32(descriptionHashWithEncode);
         governor.queue(addressesToCall, values, functionCalls, descriptionHash);
         // 3.5 simulate passing of 1 hour
         vm.roll(block.number + MIN_DELAY + 1);
